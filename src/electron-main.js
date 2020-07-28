@@ -14,6 +14,7 @@ const ipcMain = electron.ipcMain;
 const shell = electron.shell;
 const BrowserWindow = electron.BrowserWindow;
 let mainWindow;
+let splashScreen;
 
 // get command line args
 const args = process.argv.slice(1);
@@ -30,7 +31,37 @@ if (isDev && isServing) {
   require('electron-reload')(__dirname, {});
 }
 
-const createWindow = function () {
+const createSplashScreen = function () {
+  console.log('create splash')
+  splashscreen = new BrowserWindow({
+    width: 300,
+    height: 218,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    show: true
+  });
+
+  splashscreen.loadURL(
+    url.format({
+      pathname: path.join(__dirname, 'splashscreen.html'),
+      protocol: 'file:',
+      slashes: true
+    })
+  );
+
+  splashscreen.on('closed', () => {
+    splashscreen = null;
+  });
+
+  splashscreen.once('ready-to-show', () => {
+    splashscreen.show();
+  });
+};
+
+const init = function () {
+  createSplashScreen();
+
   const mainWindowState = windowState({
     defaultWidth: 1024,
     defaultHeight: 768
@@ -46,13 +77,12 @@ const createWindow = function () {
     title: `Mockoon`,
     backgroundColor: '#252830',
     icon: path.join(__dirname, '/icon_512x512x32.png'),
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       devTools: isDev ? true : false
     }
   });
-
-  mainWindowState.manage(mainWindow);
 
   // and load the index.html of the app.
   mainWindow.loadURL(
@@ -75,6 +105,16 @@ const createWindow = function () {
     if (url.includes('openexternal::')) {
       shell.openExternal(url.split('::')[1]);
     }
+  });
+
+  // when main app finish loading, hide splashscreen and show the mainWindow
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (splashscreen) {
+      splashscreen.close();
+    }
+
+    mainWindowState.manage(mainWindow);
+    mainWindow.show();
   });
 
   // Emitted when the window is closed.
@@ -341,7 +381,7 @@ const createAppMenu = function () {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', init);
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
@@ -362,6 +402,6 @@ app.on('activate', function () {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (mainWindow === null) {
-    createWindow();
+    init();
   }
 });
